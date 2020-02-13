@@ -2,53 +2,13 @@ import axios from "axios"
 import { discordOptions } from "./config"
 import Discord from "discord.io"
 
-interface List<T> {
-  [key: string]: T
-}
+import { scrapeSmilies, notAnimated } from "./smilies"
 
 let smilies: List<string> = {}
 let cache: List<Buffer> = {}
 
 const logWithTime = (string: string) => {
   console.log(new Date().toISOString(), '-', string)
-}
-
-const scrapeSmilies = async () => {
-  try {
-    const url = `https://forums.somethingawful.com/misc.php?action=showsmilies`
-    const response = await axios.get(url)
-
-    const lines = (response.data as string).split("\n")
-
-    let dictionary: List<string> = {}
-    
-    lines.forEach((line, index) => {
-      const regex = /^<li class="smilie">$/
-
-      if (regex.test(line)) {
-        const textLine = lines[index + 1]
-        const imageLine = lines[index + 2]
-        const textRegex = /^ ?<div class="text">(:.*)<\/div>$/
-        const imageRegex = /^ ?<img alt=".*" src="(https\:\/\/.*)" title=".*">$/
-
-        if (!textRegex.test(textLine) || !imageRegex.test(imageLine)) return
-
-        const textMatch = textLine.match(textRegex)
-        const imageMatch = imageLine.match(imageRegex)
-        if (!textMatch || !imageMatch) return
-
-        const keyword = textMatch[1]
-        const file = imageMatch[1]
-
-        dictionary[keyword] = file
-      }
-    })
-
-    return dictionary
-  } catch (e) {
-    console.log('error fetching smilies', e)
-    return {}
-  }
 }
 
 const fetchImage = async (key: string) => {
@@ -92,6 +52,7 @@ const getClient = async () => {
       if (keys.includes(word)) {
         let image: Buffer | undefined
         let filename = (smilies[word].split("/").pop() || "")
+        if (notAnimated.includes(word)) filename = filename.replace('.gif', '.png') //this removes the gif selector popup in discord ui
 
         if (!cache[word]) {
           image = await fetchImage(word)
