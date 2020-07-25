@@ -1,6 +1,6 @@
 {
   "name": "beepboop",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "beep boop",
   "main": "index.js",
   "author": "cambo",
@@ -9,7 +9,7 @@
     "@types/node": "^13.7.0",
     "animated-gif-detector": "^1.2.0",
     "axios": "^0.19.2",
-    "discord.io": "Woor/discord.io#gateway_v6",
+    "discord.io": "indentedspace/discord.io",
     "typescript": "^3.7.5"
   },
   "scripts": {
