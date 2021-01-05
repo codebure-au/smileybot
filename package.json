@@ -8,7 +8,7 @@
   "dependencies": {
     "@types/node": "^13.7.0",
     "animated-gif-detector": "^1.2.0",
-    "axios": "^0.19.2",
+    "axios": "^0.21.1",
     "discord.io": "indentedspace/discord.io",
     "typescript": "^3.7.5"
   },
