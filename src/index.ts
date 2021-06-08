@@ -1,86 +1,79 @@
-import axios from "axios"
-import { discordOptions } from "./config"
-import Discord from "discord.io"
+import axios from "axios";
+import Discord from "discord.js";
+import { token } from "./config.json";
 
-import { scrapeSmilies, notAnimated } from "./smilies"
+import { scrapeSmilies, notAnimated } from "./smilies";
 
-let smilies: List<string> = {}
-let cache: List<Buffer> = {}
+let smilies: Record<string, string> = {};
+let cache: Record<string, Buffer> = {};
 
-const logWithTime = (string: string) => {
-  console.log(new Date().toISOString(), '-', string)
-}
+const logWithTime = (...args: any[]) => {
+  console.log(new Date().toISOString(), "-", ...args);
+};
 
 const fetchImage = async (key: string) => {
   try {
-    const url = smilies[key]
+    const url = smilies[key];
 
-    if (!url) throw new Error(`no url for key ${key}`)
+    if (!url) throw new Error(`no url for key ${key}`);
 
-    const response = await axios.get(url, { responseType: "arraybuffer" })
-    const image = Buffer.from(response.data, 'binary')
-    cache[key] = image
+    const response = await axios.get(url, { responseType: "arraybuffer" });
+    const image = Buffer.from(response.data, "binary");
+    cache[key] = image;
 
-    return image
+    return image;
   } catch (e) {
-    console.log(e)
-    return undefined
+    console.log(e);
+    return undefined;
   }
-}
+};
 
-const getClient = async () => {
-  smilies = await scrapeSmilies()
-  const keys = Object.keys(smilies)
+const refreshSmilies = async () => {
+  smilies = { ...smilies, ...(await scrapeSmilies()) };
+};
 
-  const bot = new Discord.Client(discordOptions)
+const client = new Discord.Client();
 
-  bot.on('connect', () => logWithTime('connected'))
-  bot.on('disconnect', () => {
-    logWithTime('disconnected')
+client.on("ready", () => {
+  logWithTime("client ready");
+});
 
-    setTimeout(() => {
-      bot.connect()
-    }, 5000)
-  })
+client.on("message", async ({ content, channel }) => {
+  const words = content.split(" ");
 
-  bot.on('ready', () => logWithTime(`logged in as ${bot.username} - ${bot.id}`))
+  words.forEach(async (word) => {
+    if (Object.keys(smilies).includes(word)) {
+      let image: Buffer | undefined;
+      let fileName = smilies[word].split("/").pop() || "";
+      if (notAnimated.includes(word))
+        fileName = fileName.replace(".gif", ".png"); //this removes the gif selector popup in discord ui
 
-  bot.on('message', async (user, userID, channelID, message, event) => {
-    const words = message.split(" ")
-
-    words.forEach(async (word) => {
-      if (keys.includes(word)) {
-        let image: Buffer | undefined
-        let filename = (smilies[word].split("/").pop() || "")
-        if (notAnimated.includes(word)) filename = filename.replace('.gif', '.png') //this removes the gif selector popup in discord ui
-
-        if (!cache[word]) {
-          image = await fetchImage(word)
-        } else {
-          image = cache[word]
-        }
-
-        if (!image) return
-
-        try {
-          bot.uploadFile({
-            to: channelID,
-            file: image,
-            filename
-          }, () => {
-            logWithTime(`sent smilie ${word}`)
-          })
-        } catch (e) {
-          console.log(e)
-        }
+      if (!cache[word]) {
+        image = await fetchImage(word);
+      } else {
+        image = cache[word];
       }
-    })
-  })
-}
 
-getClient()
+      if (!image) return;
 
-setTimeout(() => {
-  logWithTime('ending script for the day')
-  process.exit()
-}, 1000 * 60 * 60 * 24)
+      try {
+        const attachment = new Discord.MessageAttachment(image, fileName);
+        await channel.send(attachment);
+      } catch (e) {
+        logWithTime(e);
+      }
+    }
+  });
+});
+
+client.on("error", (error) => {
+  logWithTime("ERROR", error);
+});
+
+client.setInterval(() => {
+  refreshSmilies();
+}, 1000 * 60 * 60 * 24);
+
+refreshSmilies().then(() => {
+  client.login(token);
+});

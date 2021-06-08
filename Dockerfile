@@ -1,4 +1,4 @@
-FROM node:alpine 
+FROM node:16-alpine 
 
 WORKDIR /usr/src/app
 
@@ -11,4 +11,4 @@ COPY . .
 
 RUN yarn build
 
-CMD ["yarn", "start"]
+CMD ["node", "./build/index.js"]
