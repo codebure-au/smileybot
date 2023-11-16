@@ -1,8 +1,11 @@
-import axios from "axios";
-import Discord from "discord.js";
+import Discord, {
+  AttachmentBuilder,
+  Events,
+  GatewayIntentBits,
+} from "discord.js";
 import { token } from "./config.json";
 
-import { scrapeSmilies, notAnimated } from "./smilies";
+import { scrapeSmilies } from "./smilies";
 
 let smilies: Record<string, string> = {};
 let cache: Record<string, Buffer> = {};
@@ -17,8 +20,9 @@ const fetchImage = async (key: string) => {
 
     if (!url) throw new Error(`no url for key ${key}`);
 
-    const response = await axios.get(url, { responseType: "arraybuffer" });
-    const image = Buffer.from(response.data, "binary");
+    const response = await fetch(url);
+    const data = await response.arrayBuffer();
+    const image = Buffer.from(data);
     cache[key] = image;
 
     return image;
@@ -32,21 +36,25 @@ const refreshSmilies = async () => {
   smilies = { ...smilies, ...(await scrapeSmilies()) };
 };
 
-const client = new Discord.Client();
+const client = new Discord.Client({
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
+  ],
+});
 
-client.on("ready", () => {
+client.once(Events.ClientReady, () => {
   logWithTime("client ready");
 });
 
-client.on("message", async ({ content, channel }) => {
+client.on(Events.MessageCreate, async ({ content, channel }) => {
   const words = content.split(" ");
 
   words.forEach(async (word) => {
     if (Object.keys(smilies).includes(word)) {
       let image: Buffer | undefined;
       let fileName = smilies[word].split("/").pop() || "";
-      if (notAnimated.includes(word))
-        fileName = fileName.replace(".gif", ".png"); //this removes the gif selector popup in discord ui
 
       if (!cache[word]) {
         image = await fetchImage(word);
@@ -57,20 +65,21 @@ client.on("message", async ({ content, channel }) => {
       if (!image) return;
 
       try {
-        const attachment = new Discord.MessageAttachment(image, fileName);
-        await channel.send(attachment);
-      } catch (e) {
-        logWithTime(e);
+        const attachment = new AttachmentBuilder(image, { name: fileName });
+        await channel.send({ files: [attachment] });
+      } catch (e: any) {
+        const error: Error = e;
+        logWithTime(error.message);
       }
     }
   });
 });
 
-client.on("error", (error) => {
+client.on(Events.Error, (error) => {
   logWithTime("ERROR", error);
 });
 
-client.setInterval(() => {
+setInterval(() => {
   refreshSmilies();
 }, 1000 * 60 * 60 * 24);
 
